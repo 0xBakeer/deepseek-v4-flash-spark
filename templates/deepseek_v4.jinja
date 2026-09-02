@@ -1,0 +1,92 @@
+{#- DeepSeek-V4 chat template for TabbyAPI/exllamav3 — a 1:1 port of deepseek-ai's
+    reference encoder (encoding/encoding_dsv4.py: encode_messages with drop_thinking=True).
+    Replaces the ANEMONE reconstruction, which differed from the reference in four ways:
+      * system text is rendered bare right after BOS (no <｜begin▁sys｜>/<｜end▁sys｜>)
+      * non-thinking (chat) mode ends the generation prompt with "</think>" only — the
+        reconstruction's "<think></think>" made the model reason inside plain content
+      * earlier assistant turns are "<｜Assistant｜></think>{content}<｜end▁of▁sentence｜>"
+      * the reasoning-effort text only exists in thinking mode ("low"|"high"|"max"; low = "")
+        and is the very first thing after BOS, before any system text
+    Also ports the reference tool format: tools go into the system text as the "## Tools"
+    block, assistant tool calls render as <｜DSML｜tool_calls> blocks, tool results are
+    merged into a user turn as <tool_result>…</tool_result> parts.
+
+    Variables (TabbyAPI template_vars): thinking (bool), reasoning_effort, tools, messages.
+#}
+{%- if add_generation_prompt is not defined %}{% set add_generation_prompt = true %}{% endif %}
+{%- if thinking is not defined %}{% set thinking = false %}{% endif %}
+{%- set effort_text = {
+      'high': 'Reasoning Effort: Absolute maximum with no shortcuts permitted.\nYou MUST be very thorough in your thinking and comprehensively decompose the problem to resolve the root cause, rigorously stress-testing your logic against all potential paths, edge cases, and adversarial scenarios.\nExplicitly write out your entire deliberation process, documenting every intermediate step, considered alternative, and rejected hypothesis to ensure absolutely no assumption is left unchecked.\n\n',
+      'max': 'Reasoning Effort: Beyond maximum — exhaustive, relentless, and uncompromising.\nYou MUST reason with the utmost depth and rigor, leaving absolutely nothing to chance: exhaustively decompose the problem into its most fundamental components, trace every causal chain to its root, and resolve the underlying cause rather than any surface symptom.\nDo not stop reasoning until you have independently verified the solution from multiple angles and are certain that no assumption remains unchecked and no error remains undiscovered.\n\n'
+   } %}
+{%- set dsml = '｜DSML｜' %}
+{%- set ns = namespace(last_user=-1, sys_seen=false, tools_done=false) %}
+{%- for m in messages %}
+    {%- if m['role'] in ['user', 'developer', 'tool'] %}{% set ns.last_user = loop.index0 %}{% endif %}
+    {%- if m['role'] == 'system' %}{% set ns.sys_seen = true %}{% endif %}
+{%- endfor %}
+{%- set tools_block = namespace(text='') %}
+{%- if tools is defined and tools %}
+    {%- set schemas = tools | map(attribute='function') | map('tojson', ensure_ascii=false) | list %}
+    {%- set tools_block.text = '## Tools\n\nYou have access to a set of tools to help answer the user\'s question. You can invoke tools by writing a "<' ~ dsml ~ 'tool_calls>" block like the following:\n\n<' ~ dsml ~ 'tool_calls>\n<' ~ dsml ~ 'invoke name="$TOOL_NAME">\n<' ~ dsml ~ 'parameter name="$PARAMETER_NAME" string="true|false">$PARAMETER_VALUE</' ~ dsml ~ 'parameter>\n...\n</' ~ dsml ~ 'invoke>\n<' ~ dsml ~ 'invoke name="$TOOL_NAME2">\n...\n</' ~ dsml ~ 'invoke>\n</' ~ dsml ~ 'tool_calls>\n\nString parameters should be specified as is and set `string="true"`. For all other types (numbers, booleans, arrays, objects), pass the value in JSON format and set `string="false"`.\n\nIf thinking_mode is enabled (triggered by <think>), you MUST output your complete reasoning inside <think>...</think> BEFORE any tool calls or final response.\n\nOtherwise, output directly after </think> with tool calls or final response.\n\n### Available Tool Schemas\n\n' ~ (schemas | join('\n')) ~ '\n\nYou MUST strictly follow the above defined tool name and parameter schemas to invoke tool calls.\n' %}
+{%- endif %}
+{{- bos_token }}
+{%- if thinking and reasoning_effort is defined and reasoning_effort in effort_text %}{{ effort_text[reasoning_effort] }}{% endif %}
+{%- if not ns.sys_seen and tools_block.text %}{{ '\n\n' ~ tools_block.text }}{% set ns.tools_done = true %}{% endif %}
+{#- reference: when tools are present, reasoning is kept on every assistant turn (drop_thinking=False) #}
+{%- set keep_all = thinking and tools_block.text != '' %}
+{%- for m in messages %}
+    {%- set role = m['role'] %}
+    {%- set content = m['content'] if m['content'] is string else (m['content'] | map(attribute='text') | join('') if m['content'] else '') %}
+    {%- if role == 'system' %}
+        {{- content }}
+        {%- if tools_block.text and not ns.tools_done %}{{ '\n\n' ~ tools_block.text }}{% set ns.tools_done = true %}{% endif %}
+    {%- elif role == 'developer' %}
+        {{- '<｜User｜>' ~ content }}
+    {%- elif role == 'user' %}
+        {%- if loop.index0 > 0 and messages[loop.index0 - 1]['role'] == 'tool' %}
+            {{- '\n\n' ~ content }}
+        {%- else %}
+            {{- '<｜User｜>' ~ content }}
+        {%- endif %}
+    {%- elif role == 'tool' %}
+        {%- if loop.index0 > 0 and messages[loop.index0 - 1]['role'] == 'tool' %}
+            {{- '\n\n' }}
+        {%- else %}
+            {{- '<｜User｜>' }}
+        {%- endif %}
+        {{- '<tool_result>' ~ content ~ '</tool_result>' }}
+    {%- elif role == 'assistant' %}
+        {%- if '</think>' in content %}{% set content = content.split('</think>')[-1] %}{% endif %}
+        {%- if '<details type="reasoning"' in content and '</details>' in content %}{% set content = content.split('</details>')[-1] %}{% endif %}
+        {%- set content = content.lstrip('\n') %}
+        {%- if thinking and (keep_all or loop.index0 > ns.last_user) %}
+            {{- (m['reasoning_content'] or '') ~ '</think>' }}
+        {%- endif %}
+        {{- content }}
+        {%- if m['tool_calls'] %}
+            {{- '\n\n<' ~ dsml ~ 'tool_calls>\n' }}
+            {%- for tc in m['tool_calls'] %}
+                {%- set fn = tc['function'] if 'function' in tc else tc %}
+                {%- set args = fn['arguments'] %}
+                {{- '<' ~ dsml ~ 'invoke name="' ~ fn['name'] ~ '">\n' }}
+                {%- if args is mapping %}
+                    {%- for k, v in args.items() %}
+                        {{- '<' ~ dsml ~ 'parameter name="' ~ k ~ '" string="' ~ ('true' if v is string else 'false') ~ '">' ~ (v if v is string else (v | tojson(ensure_ascii=false))) ~ '</' ~ dsml ~ 'parameter>' }}
+                        {%- if not loop.last %}{{ '\n' }}{% endif %}
+                    {%- endfor %}
+                {%- else %}
+                    {{- '<' ~ dsml ~ 'parameter name="arguments" string="true">' ~ args ~ '</' ~ dsml ~ 'parameter>' }}
+                {%- endif %}
+                {{- '\n</' ~ dsml ~ 'invoke>' }}
+                {%- if not loop.last %}{{ '\n' }}{% endif %}
+            {%- endfor %}
+            {{- '\n</' ~ dsml ~ 'tool_calls>' }}
+        {%- endif %}
+        {{- '<｜end▁of▁sentence｜>' }}
+    {%- endif %}
+    {%- if role in ['user', 'developer', 'tool'] and (loop.last or messages[loop.index0 + 1]['role'] == 'assistant') %}
+        {{- '<｜Assistant｜>' }}
+        {{- '<think>' if (thinking and (keep_all or loop.index0 >= ns.last_user)) else '</think>' }}
+    {%- endif %}
+{%- endfor %}

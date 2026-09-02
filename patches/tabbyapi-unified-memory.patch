@@ -1,0 +1,26 @@
+diff --git a/backends/exllamav3/model.py b/backends/exllamav3/model.py
+index ea02151..5034cfa 100644
+--- a/backends/exllamav3/model.py
++++ b/backends/exllamav3/model.py
+@@ -264,6 +264,12 @@ class ExllamaV3Container:
+         if gpu_count == 1:
+             self.gpu_split_auto = False
+             xlogger.info("Disabling GPU split because one GPU is in use.")
++            # Unified-memory boards (GB10): honor a manual gpu_split so the budget is
++            # total-based instead of mem_get_info().free, which excludes page cache.
++            if gpu_split:
++                self.gpu_split = gpu_split
++                self.autosplit_reserve = None
++                xlogger.info(f"Single GPU: using manual memory budget {gpu_split} GB")
+         else:
+             # Set tensor parallel
+             if use_tp:
+@@ -697,7 +703,7 @@ class ExllamaV3Container:
+ 
+         if self.use_draft_model:
+             for value in self.draft_model.load_gen(
+-                reserve_per_device=self.autosplit_reserve,
++                reserve_per_device=None if self.draft_gpu_split else self.autosplit_reserve,
+                 use_per_device=self.draft_gpu_split or None,
+                 callback=progress_callback,
+             ):

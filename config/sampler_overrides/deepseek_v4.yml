@@ -1,0 +1,48 @@
+# DeepSeek-V4-Flash-0731 — the sampling DeepSeek recommends for local deployment.
+#
+# From the model's own README: "we recommend setting the sampling parameters to
+# temperature = 1.0, with top_p = 0.95 for agentic scenarios and top_p = 1.0 otherwise."
+# generation_config.json agrees: do_sample true, temperature 1.0, top_p 1.0.
+#
+# Everything else is neutralised on purpose. min_p in particular is not a DeepSeek
+# recommendation, and truncating samplers plus low temperature are what push this model
+# into repetition loops on long reasoning.
+#
+# force: false everywhere, so these are fallbacks. A client that sends its own values still
+# wins; a client that sends none gets DeepSeek's recommendation instead of TabbyAPI's.
+
+temperature:
+  override: 1.0
+  force: false
+
+top_p:
+  override: 1.0
+  force: false
+
+min_p:
+  override: 0.0
+  force: false
+
+top_k:
+  override: 0
+  force: false
+
+top_a:
+  override: 0.0
+  force: false
+
+typical:
+  override: 1.0
+  force: false
+
+repetition_penalty:
+  override: 1.0
+  force: false
+
+frequency_penalty:
+  override: 0.0
+  force: false
+
+presence_penalty:
+  override: 0.0
+  force: false

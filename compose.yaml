@@ -1,0 +1,30 @@
+# docker compose up -d      → pulls the image, downloads the weights on first start, serves on :8000
+#
+# The API is published on 127.0.0.1 only. To reach it from other machines, change the port
+# mapping to "8000:8000" AND turn auth on (see docs/configuration.md) — an open, unauthenticated
+# port is your GPU for anyone who finds it.
+services:
+  deepseek:
+    image: ghcr.io/0xbakeer/deepseek-v4-flash-spark:${RECIPE_VERSION:-0.1.0}
+    build: .
+    container_name: deepseek-v4-flash
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PORT:-8000}:8000"
+    volumes:
+      - ${MODELS_DIR:-./models}:/models
+      - ./config/config.yml:/app/config/config.yml:ro
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+      - WATCHDOG_MIN_AVAIL_GB=${WATCHDOG_MIN_AVAIL_GB:-4}
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

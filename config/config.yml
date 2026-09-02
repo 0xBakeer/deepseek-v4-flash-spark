@@ -1,0 +1,63 @@
+# TabbyAPI configuration for DeepSeek V4 Flash (exl3 2.54 bpw) on one DGX Spark.
+#
+# Every value here was measured, not guessed — the reasoning behind each one is in
+# docs/configuration.md. Change them there first, then here.
+
+network:
+  host: 0.0.0.0            # inside the container; compose binds the host side to 127.0.0.1
+  port: 8000
+  disable_auth: true       # the port is only published on localhost by default — see docs/configuration.md
+  disable_fetch_requests: true
+  send_tracebacks: false
+  api_servers: ["OAI"]
+
+logging:
+  log_prompt: false
+  log_generation_params: false
+  log_requests: false
+
+model:
+  model_dir: /models
+  model_name: deepseek-v4-flash-0731
+  backend: exllamav3
+  prompt_template: deepseek_v4       # templates/deepseek_v4.jinja, a port of DeepSeek's reference encoder
+
+  # Context. 393,216 tokens per request, and a paged pool twice that size so the prefix cache
+  # can keep two full-length conversations warm. The DSA cache is small (2.5 GiB at 384k) —
+  # context on this pack is limited by prefill time, not by memory.
+  max_seq_len: 393216
+  cache_size: 786432
+  cache_mode: FP16                   # quantised cache modes are ignored for DSA layers; FP16 is what runs
+  chunk_size: 2048
+  max_batch_size: 1
+
+  # Memory. A single GPU with unified memory: give the engine a fixed budget (GB) rather than
+  # letting it size itself from "free" memory, which excludes the page cache.
+  gpu_split_auto: false
+  gpu_split: [106]
+
+  # Reasoning. The template puts the model in non-thinking mode unless a request asks for it
+  # with chat_template_kwargs: {"thinking": true}. Reasoning tokens then arrive in
+  # reasoning_content, separated by these markers.
+  reasoning: true
+  reasoning_start_token: "<think>"
+  reasoning_end_token: "</think>"
+  template_vars_default:
+    thinking: false
+    reasoning_effort: low            # low | high | max; only read when thinking is on
+
+  # Tool calling. DeepSeek V4 emits DSML tool-call blocks; this makes the server parse them
+  # into OpenAI-style tool_calls instead of returning them as text.
+  tool_format: deepseek_v4
+
+memory:
+  cuda_malloc_async: true
+
+sampling:
+  override_preset: deepseek_v4       # sampler_overrides/deepseek_v4.yml — DeepSeek's recommended sampling
+
+# Speculative decoding with the pack's own MTP head. The draft gets its own 8 GB budget.
+draft_model:
+  draft_mode: mtp
+  draft_gpu_split: [8]
+  draft_cache_mode: FP16

@@ -1,0 +1,6 @@
+.git
+models/
+docs/
+bench/
+*.md
+!README.md
