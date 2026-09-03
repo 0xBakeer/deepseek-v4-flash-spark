@@ -5,7 +5,7 @@
 # port is your GPU for anyone who finds it.
 services:
   deepseek:
-    image: ghcr.io/0xbakeer/deepseek-v4-flash-spark:${RECIPE_VERSION:-0.1.0}
+    image: ghcr.io/0xbakeer/deepseek-v4-flash-spark:${RECIPE_VERSION:-0.1.1}
     build: .
     container_name: deepseek-v4-flash
     restart: unless-stopped

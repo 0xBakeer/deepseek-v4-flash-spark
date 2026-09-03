@@ -36,15 +36,16 @@ model:
   gpu_split_auto: false
   gpu_split: [106]
 
-  # Reasoning. The template puts the model in non-thinking mode unless a request asks for it
-  # with chat_template_kwargs: {"thinking": true}. Reasoning tokens then arrive in
-  # reasoning_content, separated by these markers.
+  # Reasoning. The template puts the model in non-thinking mode unless a request asks for it:
+  # chat_template_kwargs: {"thinking": true}, enable_thinking: true, or a top-level
+  # reasoning_effort of medium/high/max all turn it on. Reasoning tokens then arrive in
+  # reasoning_content, separated by these markers. Do not put `thinking` in the defaults:
+  # the template derives it from reasoning_effort only while it is unset.
   reasoning: true
   reasoning_start_token: "<think>"
   reasoning_end_token: "</think>"
   template_vars_default:
-    thinking: false
-    reasoning_effort: low            # low | high | max; only read when thinking is on
+    reasoning_effort: low            # low (thinking off) | medium | high | max (thinking on)
 
   # Tool calling. DeepSeek V4 emits DSML tool-call blocks; this makes the server parse them
   # into OpenAI-style tool_calls instead of returning them as text.

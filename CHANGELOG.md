@@ -11,6 +11,24 @@ is a measurement epoch — the configuration as it stood, and the figures that b
 Every entry leads with **Defaults that changed**. `./run.sh` and the container print the version
 they were launched from. The image is tagged with it: `ghcr.io/0xbakeer/deepseek-v4-flash-spark:<version>`.
 
+## v0.1.1 — 2026-09-03
+
+### Defaults that changed
+
+None that move a number. `template_vars_default` no longer pins `thinking: false`; the
+template derives the switch instead, and the rendered prompt is byte-identical for every
+request shape v0.1.0 accepted.
+
+### Changed
+
+- Thinking can be switched on with the OpenAI-style fields alone: a top-level
+  `reasoning_effort` of `medium`/`high`/`max` (`xhigh` accepted as `max`), `enable_thinking: true`,
+  or `reasoning: {"effort": ...}`. Before, only `chat_template_kwargs.thinking` did, and a
+  client that sent `reasoning_effort: high` (Open WebUI's Reasoning Effort setting, for one)
+  got the effort text with thinking still off. `none`/`low` keep the default chat mode; an
+  explicit `chat_template_kwargs.thinking` still wins.
+- Docs updated accordingly (API, configuration, chat template, Open WebUI).
+
 ## v0.1.0 — 2026-09-02
 
 First release.

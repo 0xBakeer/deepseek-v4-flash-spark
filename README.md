@@ -39,7 +39,7 @@ tokens, so a 100k-token document takes about two minutes to read and a 300k one 
 | Context per request | 393,216 tokens (a 1M configuration loads; see [configuration](docs/configuration.md#context)) |
 | Memory at idle | 106 GB used, 15 GB available |
 | Disk | 92 GB weights + 12 GB image |
-| Thinking | off by default, on per request, effort low / high / max |
+| Thinking | off by default; on per request via `reasoning_effort`, `enable_thinking`, or `chat_template_kwargs.thinking` |
 | Tools | OpenAI `tools` → parsed `tool_calls` |
 | Concurrency | one request at a time, queued (`max_batch_size` is the knob) |
 
@@ -88,6 +88,9 @@ commits, same patches, in a venv.
 ```json
 "chat_template_kwargs": {"thinking": true, "reasoning_effort": "high"}
 ```
+
+A plain top-level `"reasoning_effort": "high"` (or `medium`, `max`) does the same, as does
+`"enable_thinking": true`, so clients that only expose the OpenAI fields can switch it on.
 
 **Tools.** Standard OpenAI `tools`; the server returns `finish_reason: "tool_calls"` with
 parsed arguments. Attach tools to the requests that need them — the model likes to use what it

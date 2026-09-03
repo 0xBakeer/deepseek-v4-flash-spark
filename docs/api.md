@@ -72,6 +72,19 @@ curl -s http://127.0.0.1:8000/v1/chat/completions \
 carry reasoning as `delta.reasoning_content` before the first `delta.content`. Budget for it:
 a `high` answer to a hard question is routinely several thousand reasoning tokens.
 
+Clients that only know the OpenAI-style fields work too. Any of these turn thinking on, without
+`chat_template_kwargs`:
+
+```json
+"reasoning_effort": "high"
+"enable_thinking": true
+"reasoning": {"effort": "high"}
+```
+
+`reasoning_effort` at the top level: `none` and `low` keep thinking off, `medium` turns it on
+with no effort text, `high` and `max` add DeepSeek's effort text; `xhigh` is accepted as `max`.
+An explicit `chat_template_kwargs.thinking` always wins over the derived value.
+
 ## Tool calling
 
 Standard OpenAI `tools` / `tool_choice`. The server parses the model's DSML block into

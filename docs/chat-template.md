@@ -47,9 +47,9 @@ does the template.
 
 ## Driving it from the API
 
-The template reads three variables: `thinking`, `reasoning_effort`, and the request's `tools`.
-Defaults come from `template_vars_default` in `config.yml` (thinking off, effort low). Any
-request can override them:
+The template reads four variables: `thinking`, `enable_thinking`, `reasoning_effort`, and the
+request's `tools`. Defaults come from `template_vars_default` in `config.yml` (effort low, no
+`thinking`, so it derives to off). Any request can override them:
 
 ```json
 {
@@ -59,9 +59,12 @@ request can override them:
 }
 ```
 
-`template_vars` is accepted as an alias of `chat_template_kwargs`, and a top-level
-`reasoning_effort` field works as well. With thinking on, the server splits the output at
-`</think>` and returns the reasoning in `reasoning_content`.
+`template_vars` is accepted as an alias of `chat_template_kwargs`. The top-level OpenAI-style
+fields work as well, and can switch thinking on by themselves: when the request sets no
+`thinking`, the template uses `enable_thinking` if present, otherwise `reasoning_effort`
+(`none`/`low` → off, `medium`/`high`/`max` → on; `xhigh` is read as `max`). The server maps
+`reasoning.effort` / `reasoning.enabled` onto the same two variables. With thinking on, the
+server splits the output at `</think>` and returns the reasoning in `reasoning_content`.
 
 ## If you edit it
 

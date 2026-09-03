@@ -77,7 +77,6 @@ reasoning: true
 reasoning_start_token: "<think>"
 reasoning_end_token: "</think>"
 template_vars_default:
-  thinking: false
   reasoning_effort: low
 ```
 
@@ -87,6 +86,11 @@ answers directly. Any request can turn it on:
 ```json
 "chat_template_kwargs": {"thinking": true, "reasoning_effort": "high"}
 ```
+
+or, for clients that only speak the OpenAI fields, a top-level `"reasoning_effort": "high"`
+(`medium`/`max` too), `"enable_thinking": true`, or `"reasoning": {"effort": "high"}`. The
+template derives `thinking` from those only while no explicit `thinking` is set, which is why
+`template_vars_default` must not contain `thinking` — a default there would pin it.
 
 Reasoning tokens are then returned in `reasoning_content` (and streamed as
 `delta.reasoning_content`), never mixed into `content`. `reasoning_effort` is `low`, `high`

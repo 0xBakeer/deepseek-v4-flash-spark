@@ -32,8 +32,13 @@ streams at 50+ tok/s, prose at ~30, either way.
 ## Thinking
 
 Open WebUI renders `reasoning_content` as a collapsible thinking block. Thinking is off by
-default on the server; to turn it on for one model entry, add to that entry's *Advanced
-Params → Custom Parameters* (or in the request via a filter):
+default on the server. Open WebUI already sends its *Reasoning Effort* setting as a top-level
+`reasoning_effort`, so the simplest switch is that field: set it to `high` (or `medium`, `max`)
+in a model entry's *Advanced Params*, or per chat in *Chat Controls*, and that entry thinks.
+`low` (or unset) keeps thinking off. A separate "Thinking" entry with `reasoning_effort: high`
+next to the plain one is a good way to have both in the model picker.
+
+The explicit form still works, via *Custom Parameters* (or a filter):
 
 ```json
 {"chat_template_kwargs": {"thinking": true, "reasoning_effort": "high"}}
